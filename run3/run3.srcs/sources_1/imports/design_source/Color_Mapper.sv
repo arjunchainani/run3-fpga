@@ -14,22 +14,83 @@
 //-------------------------------------------------------------------------
 
 
-module  color_mapper ( input  logic [9:0] BallX, BallY, DrawX, DrawY, Ball_size,
-                       output logic [3:0]  Red, Green, Blue );
+module  color_mapper ( input  logic clk,
+                       input  logic reset,
+                       input  logic vsync,
+                       input  logic [3:0] perspective,
+                       input  logic [4:0][15:0] walls,
+                       input  logic [9:0] SpriteX, SpriteY, DrawX, DrawY,
+                       output logic [3:0] Red, Green, Blue );
     
-    logic ball_on;
+//    (* mark_debug = "true" *) logic sprite_on;
+//    (* mark_debug = "true" *) logic [9:0] DrawX_debug, DrawY_debug;
+//    assign DrawX_debug = DrawX;
+//    assign DrawY_debug = DrawY;    
+    logic sprite_on;
+    
+    logic [3:0] palette_red, palette_green, palette_blue;
+    
+    logic sprite_on_d;
     // logic mem_array [0:4095];
     logic pixel_output;
     logic pixel_data;
-    logic [11:0] rom_addr;
+    logic [11:0] stars_rom_addr, alien_rom_addr;
+    logic [4:0] SpriteH;
+    logic [4:0] SpriteW;
+    logic [1:0] alien_output;
+    
+    // flip flop to cycle between sprite states on every edge of vsync (negative edge since vsync is active low)
+    logic [1:0] sprite_select;
+    
+    parameter int ANIM_FRAMES = 8;
+    int frame_counter;
+    
+    always_ff @(posedge vsync) begin
+        if (reset) begin
+            sprite_select <= 2'b00;
+            frame_counter <= 0;
+        end
+        else begin
+            if (frame_counter == ANIM_FRAMES - 1) begin
+                frame_counter <= 0;
+                if (sprite_select == 2'b10)
+                    sprite_select <= 2'b00;
+                else
+                    sprite_select <= sprite_select + 2'b01;
+            end
+            else begin
+                frame_counter <= frame_counter + 1;
+            end
+        end
+    end
+    
+    assign SpriteH = 48;
+    assign SpriteW = 64;
 
-    assign rom_addr = (DrawY[5:0] << 6) + DrawX[5:0];
-
-    stars_rom ROM(
-        .addr(rom_addr),
+    assign stars_rom_addr = (DrawY[5:0] << 6) + DrawX[5:0];
+    assign alien_rom_addr = sprite_on
+        ? ((DrawY - SpriteY) * 64 + (DrawX - SpriteX))
+        : 12'd0;        
+        
+    stars_rom stars_rom(
+        .addr(stars_rom_addr),
         .data_out(pixel_output)
     );
 
+    alien_rom alien_rom(
+//        .clk(clk),
+        .sprite_select(sprite_select),
+        .addr(alien_rom_addr),
+        .q(alien_output)
+    );
+
+    alien_palette alien_palette (
+//        .clk   (clk),
+        .index (alien_output),
+        .red   (palette_red),
+        .green (palette_green),
+        .blue  (palette_blue)
+    );
 
  /* Old Ball: Generated square box by checking if the current pixel is within a square of length
     2BallS, centered at (BallX, BallY).  Note that this requires unsigned comparisons.
@@ -45,28 +106,74 @@ module  color_mapper ( input  logic [9:0] BallX, BallY, DrawX, DrawY, Ball_size,
      of the 120 available multipliers on the chip!  Since the multiplicants are required to be signed,
       we have to first cast them from logic to int (signed by default) before they are multiplied)./
 */
-    int DistX, DistY, Size;
-    assign DistX = DrawX - BallX;
-    assign DistY = DrawY - BallY;
-    assign Size = Ball_size;
+//    int DistX, DistY, Size;
+//    assign DistX = DrawX - BallX;
+//    assign DistY = DrawY - BallY;
+//    assign Size = Ball_size;
 
-    always_comb
-    begin:Ball_on_proc
-        if ( (DistX*DistX + DistY*DistY) <= (Size * Size) )
-            ball_on = 1'b1;
-        else 
-            ball_on = 1'b0;
-    end 
+    // Sprite dimensions (match the ROM exactly)
+    localparam SPRITE_W = 64;
+    localparam SPRITE_H = 48;
+    
+    always_comb begin : sprite_on_proc
+        if (DrawX >= SpriteX && DrawX < SpriteX + SPRITE_W &&
+            DrawY >= SpriteY && DrawY < SpriteY + SPRITE_H)
+            sprite_on = 1'b1;
+        else
+            sprite_on = 1'b0;
+    end
+    always_ff @(posedge clk) begin
+        sprite_on_d <= sprite_on;
+    end
+
+    logic [4:0][15:0] shifted_walls; 
+
+    always_comb begin
+        for (int i = 0; i < 5; i++) begin
+            case (perspective)
+                4'b0100: // No shift
+                    shifted_walls[i] = walls[i];
+
+                4'b1000: // Right shift
+                    shifted_walls[i] = {walls[i][3:0], walls[i][15:4]};
+
+                4'b0010: // Left shift
+                    shifted_walls[i] = {walls[i][11:0], walls[i][15:12]};
+
+                4'b0001: // Left shift
+                    shifted_walls[i] = {walls[i][7:0], walls[i][15:8]};
+
+                default: 
+                    shifted_walls[i] = walls[i];
+            endcase
+        end
+    end
+
+    
+
+    
 
     always_comb
     begin:RGB_Display
-        if ((ball_on == 1'b1)) begin 
-            Red = 4'hf;
-            Green = 4'h7;
-            Blue = 4'h0;
+        if ((sprite_on_d == 1'b1) && ~(palette_red == 4'hf && palette_blue == 4'h0 && palette_green == 4'h0)) begin 
+            Red = palette_red;
+            Green = palette_green;
+            Blue = palette_blue;
         end
         else begin
-            if (pixel_output == 1'b1) begin
+            for (int i = 0; i < 5; i++) begin
+                for (int j = 0; j < 16; j++) begin
+                    int bit_index = (i * 16) + j;
+                    rom_addr = (DrawX + DrawY * 640) + (640 * 480 * bit_index);
+                    if ((shifted_walls[i][j] == 1'b1) && rom_data_out == 1'b1) begin
+                        Red = lvlcolor_red;
+                        Green = lvlcolor_green;
+                        Blue = lvlcolor_blue;
+                    end
+                end
+            end
+        end
+        else if (pixel_output == 1'b1 && ()) begin
                 Red = 4'hf; 
                 Green = 4'hf;
                 Blue = 4'hf;

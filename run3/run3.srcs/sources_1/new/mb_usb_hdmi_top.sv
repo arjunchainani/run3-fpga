@@ -43,7 +43,7 @@ module mb_usb_hdmi_top(
     logic [31:0] keycode0_gpio, keycode1_gpio;
     logic clk_25MHz, clk_125MHz, clk, clk_100MHz;
     logic locked;
-    logic [9:0] drawX, drawY, ballxsig, ballysig, ballsizesig;
+    logic [9:0] drawX, drawY, SpriteX, SpriteY, ballsizesig;
 
     logic hsync, vsync, vde;
     logic [3:0] red, green, blue;
@@ -51,7 +51,18 @@ module mb_usb_hdmi_top(
     
     assign reset_ah = reset_rtl_0;
     
+    // sprites
+    logic [11:0] rom_address;
+    logic [1:0] rom_q;
     
+    logic [3:0] palette_red, palette_green, palette_blue;
+    
+    logic negedge_vga_clk;   
+    
+    logic [3:0] walls;
+    logic [3:0] perspective;
+    assign walls = 4'b1111;
+        
     //Keycode HEX drivers
     hex_driver HexA (
         .clk(Clk),
@@ -134,25 +145,34 @@ module mb_usb_hdmi_top(
 
     
     //Ball Module
-    ball ball_instance(
+    sprite alien_instance(
         .Reset(reset_ah),
         .frame_clk(vsync),                    //Figure out what this should be so that the ball will move
+        .walls(walls),
         .keycode(keycode0_gpio[7:0]),    //Notice: only one keycode connected to ball by default
-        .BallX(ballxsig),
-        .BallY(ballysig),
-        .BallS(ballsizesig)
+        .SpriteX(SpriteX),
+        .SpriteY(SpriteY),
+        .Perspective(perspective)
+//        .BallS(ballsizesig)
     );
     
     //Color Mapper Module   
     color_mapper color_instance(
-        .BallX(ballxsig),
-        .BallY(ballysig),
+        .SpriteX(SpriteX),
+        .SpriteY(SpriteY),
         .DrawX(drawX),
         .DrawY(drawY),
-        .Ball_size(ballsizesig),
+        .palette_red(palette_red),
+        .palette_green(palette_green),
+        .palette_blue(palette_blue),
         .Red(red),
         .Green(green),
         .Blue(blue)
     );
+    
+    // sprite stuff
+
+    // read from ROM on negedge, set pixel on posedge
+//    assign rom_address = ((drawX * 64) / 640) + (((drawY * 48) / 480) * 64);  
     
 endmodule

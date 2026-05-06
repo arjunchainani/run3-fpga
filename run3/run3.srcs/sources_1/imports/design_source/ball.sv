@@ -114,7 +114,12 @@ module  ball
 		end  
     end
 
+/*
+    parameter [9:0] BallY_Max = 400;
+    
 
+
+*/
     
       
 endmodule
