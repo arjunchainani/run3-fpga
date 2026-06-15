@@ -1,0 +1,3 @@
+connect_debug_port u_ila_0/probe0 [get_nets [list {color_instance/DrawX_debug[0]} {color_instance/DrawX_debug[1]} {color_instance/DrawX_debug[2]} {color_instance/DrawX_debug[3]} {color_instance/DrawX_debug[4]} {color_instance/DrawX_debug[5]} {color_instance/DrawX_debug[6]} {color_instance/DrawX_debug[7]} {color_instance/DrawX_debug[8]} {color_instance/DrawX_debug[9]}]]
+connect_debug_port u_ila_0/probe1 [get_nets [list {color_instance/DrawY_debug[0]} {color_instance/DrawY_debug[1]} {color_instance/DrawY_debug[2]} {color_instance/DrawY_debug[3]} {color_instance/DrawY_debug[4]} {color_instance/DrawY_debug[5]} {color_instance/DrawY_debug[6]} {color_instance/DrawY_debug[7]} {color_instance/DrawY_debug[8]} {color_instance/DrawY_debug[9]}]]
+
