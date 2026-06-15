@@ -38,8 +38,6 @@ Check out a quick 10-second clip of our project in action at [this Youtube link]
 
 The vast majority of those are Xilinx BSP/library files (generated boilerplate). Let me focus on just the user-written source files under `latest/software/run/src/`.Here are descriptions for all the user-authored C/H files under `latest/software/run/src/`:
 
----
-
 **`latest/software/run/src/lw_usb_main.c`** - The MicroBlaze application entry point. It initializes the MAX3421E USB host chip and the AXI GPIO peripheral, then runs a polling loop that drives the USB state machine, detects keyboard or mouse connections, reads HID reports each iteration, and writes the first four keyboard keycodes out over GPIO to the FPGA fabric (where `mb_usb_hdmi_top.sv` picks them up as `keycode0_gpio`).
 
 **`latest/software/run/src/platform.c`** - Xilinx-provided (lightly customized) platform initialization glue. It enables the MicroBlaze instruction and data caches on startup via `init_platform()` and disables them on shutdown via `cleanup_platform()`, with optional UART baud-rate configuration for 16550-style UARTs.
